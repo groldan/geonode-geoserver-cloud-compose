@@ -7,7 +7,7 @@ services:
   # Application facade, provides a single entry point routing to gscloud services.
   # Called geoserver to override the vanilla geoserver container in geonode.yml
   geoserver:
-    image: geoservercloud/geoserver-cloud-gateway:1.8-SNAPSHOT
+    image: groldan/geoserver-cloud-gateway:1.8-SNAPSHOT
     #container_name: geoserver4${COMPOSE_PROJECT_NAME}
     user: 1000:1000
     depends_on:
@@ -102,7 +102,7 @@ services:
     
   # WFS microservice, port dynamically allocated to allow scaling (e.g docker-compose scale wfs=5)
   wfs:
-    image: geoservercloud/geoserver-cloud-wfs:1.8-SNAPSHOT
+    image: groldan/geoserver-cloud-wfs:1.8-SNAPSHOT
     extends:
       service: gscloudtemplate
     deploy:
@@ -110,7 +110,7 @@ services:
 
   # WMS microservice, port dynamically allocated to allow scaling (e.g docker-compose scale wms=5)
   wms:
-    image: geoservercloud/geoserver-cloud-wms:1.8-SNAPSHOT
+    image: groldan/geoserver-cloud-wms:1.8-SNAPSHOT
     extends:
       service: gscloudtemplate
     deploy:
@@ -118,7 +118,7 @@ services:
 
   # WCS microservice, port dynamically allocated to allow scaling (e.g docker-compose scale wcs=5)
   wcs:
-    image: geoservercloud/geoserver-cloud-wcs:1.8-SNAPSHOT
+    image: groldan/geoserver-cloud-wcs:1.8-SNAPSHOT
     extends:
       service: gscloudtemplate
     deploy:
@@ -126,7 +126,7 @@ services:
 
   # WPS microservice, port dynamically allocated to allow scaling (e.g docker-compose scale wps=5)
   wps:
-    image: geoservercloud/geoserver-cloud-wps:1.8-SNAPSHOT
+    image: groldan/geoserver-cloud-wps:1.8-SNAPSHOT
     extends:
       service: gscloudtemplate
     deploy:
@@ -134,7 +134,7 @@ services:
 
   # REST config microservice, port dynamically allocated to allow scaling (e.g docker-compose scale rest=5)
   rest:
-    image: geoservercloud/geoserver-cloud-rest:1.8-SNAPSHOT
+    image: groldan/geoserver-cloud-rest:1.8-SNAPSHOT
     extends:
       service: gscloudtemplate
     deploy:
@@ -142,7 +142,7 @@ services:
 
   # WEB UI microservice
   webui:
-    image: geoservercloud/geoserver-cloud-webui:1.8-SNAPSHOT
+    image: groldan/geoserver-cloud-webui:1.8-SNAPSHOT
     extends:
       service: gscloudtemplate
     ports:
@@ -154,7 +154,7 @@ services:
       replicas: 1
 
   gwc:
-    image: geoservercloud/geoserver-cloud-gwc:1.8-SNAPSHOT
+    image: groldan/geoserver-cloud-gwc:1.8-SNAPSHOT
     extends:
       service: gscloudtemplate
     volumes:
@@ -163,7 +163,7 @@ services:
       replicas: 0
 
   gscloudtemplate:
-    image: geoservercloud/geoserver-cloud-webui:1.8-SNAPSHOT
+    image: groldan/geoserver-cloud-webui:1.8-SNAPSHOT
     user: 1000:1000 # set the userid:groupid the container runs as
     environment:
       JAVA_OPTS: -XX:MaxRAMPercentage=80 -XshowSettings:system -Dgeoserver.security.authkey=true -Djndi.datasources.postgis.enabled=false
