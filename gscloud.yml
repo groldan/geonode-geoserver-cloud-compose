@@ -1,0 +1,191 @@
+volumes:
+  rabbitmq_data: # volume for rabbitmq data, so it doesn't create an anonymous one on each container
+  geowebcache_data:
+  pgconfigdb_data: # volume for postgresql data, used to store the geoserver config through pgsqlconfig backend
+        
+services:
+  # Application facade, provides a single entry point routing to gscloud services.
+  # Called geoserver to override the vanilla geoserver container in geonode.yml
+  geoserver:
+    image: geoservercloud/geoserver-cloud-gateway:1.8-SNAPSHOT
+    #container_name: geoserver4${COMPOSE_PROJECT_NAME}
+    user: 1000:1000
+    depends_on:
+      data-dir-conf:
+        condition: service_healthy
+      django:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: "standalone"
+      GEOSERVER_BASE_PATH: /geoserver
+    ports:
+      - 9090:8080
+    volumes:
+      - statics:/mnt/volumes/statics
+      - geoserver-data-dir:/geoserver_data/data
+      - backup-restore:/backup_restore
+      - data:/data
+      - tmp:/tmp
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 1G
+
+  pgconfigdb:
+    image: postgis/postgis:latest
+    # host config for both geoserver catalog and acl
+    shm_size: 2g
+    environment:
+      POSTGRES_DB: pgconfig
+      POSTGRES_USER: pgconfig
+      POSTGRES_PASSWORD: pgconfig
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pgconfig"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgconfigdb_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4G
+    
+  acl:
+    image: geoservercloud/geoserver-acl:2.1.2
+    user: 1000:1000
+    depends_on:
+      pgconfigdb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      # Override default values in the container's /etc/geoserver/acl-service.yml 
+      - PG_HOST=pgconfigdb
+      - PG_PORT=5432
+      - PG_DB=pgconfig
+      - PG_SCHEMA=acl
+      - PG_USERNAME=pgconfig
+      - PG_PASSWORD=pgconfig
+      - 'ACL_USERS_ADMIN_PASSWORD={noop}s3cr3t'
+      - 'ACL_USERS_GEOSERVER_PASSWORD={noop}s3cr3t'
+      - GEOSERVER_BUS_ENABLED=true
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 2G
+       
+#  rabbitmq:
+#    image: rabbitmq:3.11-management
+#    user: 1000:1000
+#    restart: unless-stopped
+#    volumes:
+#      - rabbitmq_data:/var/lib/rabbitmq
+#    healthcheck:
+#      test: rabbitmq-diagnostics is_running
+#      start_period: 10s
+#      interval: 15s
+#      timeout: 30s
+#      retries: 3
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '4.0'
+#          memory: 2G
+    
+  # WFS microservice, port dynamically allocated to allow scaling (e.g docker-compose scale wfs=5)
+  wfs:
+    image: geoservercloud/geoserver-cloud-wfs:1.8-SNAPSHOT
+    extends:
+      service: gscloudtemplate
+    deploy:
+      replicas: 0
+
+  # WMS microservice, port dynamically allocated to allow scaling (e.g docker-compose scale wms=5)
+  wms:
+    image: geoservercloud/geoserver-cloud-wms:1.8-SNAPSHOT
+    extends:
+      service: gscloudtemplate
+    deploy:
+      replicas: 1
+
+  # WCS microservice, port dynamically allocated to allow scaling (e.g docker-compose scale wcs=5)
+  wcs:
+    image: geoservercloud/geoserver-cloud-wcs:1.8-SNAPSHOT
+    extends:
+      service: gscloudtemplate
+    deploy:
+      replicas: 0
+
+  # WPS microservice, port dynamically allocated to allow scaling (e.g docker-compose scale wps=5)
+  wps:
+    image: geoservercloud/geoserver-cloud-wps:1.8-SNAPSHOT
+    extends:
+      service: gscloudtemplate
+    deploy:
+      replicas: 0
+
+  # REST config microservice, port dynamically allocated to allow scaling (e.g docker-compose scale rest=5)
+  rest:
+    image: geoservercloud/geoserver-cloud-rest:1.8-SNAPSHOT
+    extends:
+      service: gscloudtemplate
+    deploy:
+      replicas: 1
+
+  # WEB UI microservice
+  webui:
+    image: geoservercloud/geoserver-cloud-webui:1.8-SNAPSHOT
+    extends:
+      service: gscloudtemplate
+    ports:
+      - 9091:8081
+      - 8091:8080
+    volumes:
+      - geowebcache_data:/data/geowebcache
+    deploy:
+      replicas: 1
+
+  gwc:
+    image: geoservercloud/geoserver-cloud-gwc:1.8-SNAPSHOT
+    extends:
+      service: gscloudtemplate
+    volumes:
+      - geowebcache_data:/data/geowebcache
+    deploy:
+      replicas: 0
+
+  gscloudtemplate:
+    image: geoservercloud/geoserver-cloud-webui:1.8-SNAPSHOT
+    user: 1000:1000 # set the userid:groupid the container runs as
+    environment:
+      JAVA_OPTS: -XX:MaxRAMPercentage=80 -XshowSettings:system -Dgeoserver.security.authkey=true -Djndi.datasources.postgis.enabled=false
+      SPRING_PROFILES_ACTIVE: "standalone,pgconfig,acl"
+      ACL_URL: http://acl:8080/acl/api
+      ACL_USERNAME: admin
+      ACL_PASSWORD: s3cr3t
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      pgconfigdb:
+        condition: service_started
+      acl:
+        condition: service_healthy
+      data-dir-conf:
+        condition: service_healthy
+      django:
+        condition: service_healthy
+    deploy:
+      mode: replicated
+      replicas: 0
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
